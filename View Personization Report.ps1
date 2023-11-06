@@ -1,17 +1,17 @@
-
 <#
     .SYNOPSIS
         Script to get Personization rule level detail of current item in report format.
     .CreatedBy
         Rinku Jain
-    
+ 
 #>
-
+ 
+ 
 <#
 .SYNOPSIS
     Recurssive function to evaluate rule and insert data in related array based on whether it is a operator or a condition
-    
- .Param
+ 
+.Param
   conditionParamNode: Node which needs to evaluate 
   depth: Depth level of element in rule xml, it will help in generating final level report
 #>
@@ -19,11 +19,13 @@ function Invoke-EvaluateRule {
   param (
       [Parameter(Mandatory=$true)]
       $conditionParamNode,
-
+ 
+ 
       [Parameter(Mandatory=$false)]
       [int]$depth = 1
   )
-
+ 
+ 
   foreach ($currentNode in $conditionParamNode.ChildNodes) {
       if ($currentNode.LocalName -match $global:Operators) {
           Add-RuleOperator $depth $currentNode.LocalName $currentNode.Uid
@@ -44,15 +46,15 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
     if ($condition.except){    
        $except = "except "                
     }
-    
+ 
     if(test-path $condition.id){
       $conditionItem = Get-Item "master://" -ID $condition.id 
       $selectedItemsText=$conditionItem.Text
-      
+ 
       if($condition.selectedItems -ne $null)
       {
           $selectedItemIds= $condition.selectedItems.split("|")
-         
+ 
           $ct=0
           foreach($id in $selectedItemIds)
           {
@@ -64,13 +66,13 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
               {  $selectedItemsText=   $selectedItem.Name }
               $ct++
           }
-          $selectedItemsText = $conditionItem.Text   -replace  "\[SelectedItems.*\]" , $selectedItemsText
+          $selectedItemsText = $selectedItemsText   -replace  "\[SelectedItems,[^\]]*\]" , $selectedItemsText
       }
-      
+
       if($condition.rulesid -ne $null)
       {
           $selectedItemIds= $condition.rulesid.split("|")
-       
+ 
           $ct=0
           foreach($id in $selectedItemIds)
           {
@@ -82,9 +84,10 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
               {  $selectedItemsText=   $selectedItem.Name }
               $ct++
           }
-          $selectedItemsText = $conditionItem.Text   -replace  "\[rulesid.*\]" , $selectedItemsText 
+          $selectedItemsText = $selectedItemsText  -replace  "\[rulesid,[^\]]*\]" , $selectedItemsText 
       }
-      
+ 
+       $selectedCookieValue= $condition.CookieValue
       if($condition.operatorid -ne $null)
       {
           $selectedoperatorid= $condition.operatorid
@@ -92,15 +95,16 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
               $selectedoperatorItem = Get-Item "master://" -ID $selectedoperatorid 
               $selectedoperatorItemText=   $selectedoperatorItem.Name 
               $selectedvalue= $condition.value
-               if(test-path $selectedvalue){
+               if(($selectedvalue -ne $null) -and (test-path $selectedvalue)){
                     $selectedvalueItem = Get-Item "master://" -ID $selectedvalue
-                    $opervalue = $selectedoperatorItemText +' ' + $selectedvalueItem.Name
+                    $opervalue =  $selectedvalueItem.Name
                }
                else{
-                   $opervalue =  $selectedoperatorItemText +' ' + $selectedvalue
+                   $opervalue = $selectedvalue
                }
-               
-               $selectedItemsText = $conditionItem.Text   -replace  "\[operatorid.*\]" , $opervalue 
+ 
+               $selectedItemsText =$selectedItemsText   -replace  "\[operatorid,[^\]]*\]" , $selectedoperatorItemText 
+                $selectedItemsText = $selectedItemsText   -replace  "\[value,[^\]]*\]" , $opervalue
               }
         }
       else {
@@ -108,7 +112,7 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
            if($condition.Value -ne $null)
               {
                   $selectedItemIds= $condition.Value.split("|")
-                 
+ 
                   $ct=0
                   foreach($id in $selectedItemIds)
                   {
@@ -120,16 +124,22 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
                       {  $selectedItemsText=   $selectedItem.Name }
                       $ct++
                   }
-                  $selectedItemsText = $conditionItem.Text   -replace  "\[value.*\]" , $selectedItemsText
+                  write-host 'before ' $selectedItemsText
+                  $selectedItemsText = $conditionItem.Text   -replace  "\[value,[^\]]*\]" , $selectedItemsText
+                   write-host 'after ' $selectedItemsText
               }
       }    
-        
+ 
+     
+      if($selectedCookieValue -ne $null -and $selectedCookieValue -ne '')
+      {
+       $selectedItemsText = $selectedItemsText   -replace  "\[CookieValue,[^\]]*\]" , $selectedCookieValue 
+      }
       $selectedCookieName= $condition.CookieName
       if($selectedCookieName -ne $null -and $selectedCookieName -ne '')
       {
-       $selectedItemsText = $conditionItem.Text   -replace  "\[CookieName.*\]" , $selectedCookieName 
+       $selectedItemsText = $selectedItemsText   -replace  "\[CookieName,[^\]]*\]" , $selectedCookieName 
       }
-      
       $condText = $except + $selectedItemsText
       Write-Host "`n            ConditionName: " $conditionItem.Name  
       Write-Host "`n            ConditionText: " $condText
@@ -137,7 +147,8 @@ function Add-ConditionValue($conditions, $conditionlevel, $ParentUID ){
     }
   }        
 }
-
+ 
+ 
 <#
 .SYNOPSIS
     Add a Rule Operator and associated detail in its table
@@ -151,7 +162,8 @@ function Add-RuleOperator($level, $Operator, $UID){
     Level= $level
     UID = $UID
   }
-
+ 
+ 
   $Script:RulesOperators +=$ruleoperator 
 }
 <#
@@ -168,11 +180,12 @@ function Add-RuleCondition($level, $conditionName, $conditionText, $ParentUID, $
     Level= $level
     ParentUID=$ParentUID
     isNoCondition = $isNoCondition
-  } 
-    
+  }
+ 
   $Script:RulesConditions +=$rulesCondition 
 }
-
+ 
+ 
 <#
 .SYNOPSIS
     Add a Rule Result  and associated detail in its table
@@ -190,21 +203,24 @@ function Add-RuleResult($RenderingNumber,$RenderingName, $RuleNo, $ConditionName
     } 
   $Script:RulesResults +=$ruleresult 
 }
-
+ 
+ 
 <#
 .SYNOPSIS
-    Evaluate Rule Conditions table for all condition of a rule, create details based on operator applied and add into Result table 
+    Evaluate Rule Conditions table for all condition of a rule, create details based on operator applied and add into Result table
  
 #>
 function Invoke-Evaluate-RuleCondition-AddResult ($RenderingNumber, $rullno ){
   #  2. If rule don't have level 1 then merge all condition of it 
   #  3. Else fetch opertor of upper level and in between current condition
-  
+ 
   $ruleconditiontext =""
   $ruleconditionName =""
-
-  $allrulecondition  = $Script:RulesConditions  | Where-Object {(($_.RenderingNumber -eq $RenderingNumber) -and ($_.RuleNo -eq $rullno) -and ($_.isNoCondition -eq $false)) } 
-
+ 
+ 
+  $allrulecondition  = $Script:RulesConditions  | Where-Object {(($_.RenderingNumber -eq $RenderingNumber) -and ($_.RuleNo -eq $rullno) -and ($_.isNoCondition -eq $false)) }
+ 
+ 
   $rulelevel= $allrulecondition.level | sort-object -Descending | Get-Unique
   if ($rulelevel  -ne $null){  
       foreach($currentlevel in $rulelevel) {
@@ -230,7 +246,7 @@ function Invoke-Evaluate-RuleCondition-AddResult ($RenderingNumber, $rullno ){
                   if($ruleconditionName.Contains($singlecondition.ConditionName) -eq $false){
                     $ruleconditionName = $ruleconditionName +   $singlecondition.ConditionName + "<br>"
                   }
-                
+ 
                   $ruleconditiontext = $ruleconditiontext + $singlecondition.ConditionText + "<br>"
               }
             } 
@@ -254,12 +270,13 @@ function Invoke-Evaluate-RuleCondition-AddResult ($RenderingNumber, $rullno ){
                       } 
                       $parentconditionName+=$pconditionName
                       $parentconditionText+=$pconditiontext
-                      
-                } 
-                
+ 
+                }
+ 
                 $uidtolookup= ($Script:RulesConditions |  Where-Object {($_.RenderingNumber -eq $RenderingNumber) -and ($_.RuleNo -eq $rullno)  -and ($_.level -eq ($currentlevel-1)) -and ($_.isNoCondition -eq $true)}).parentuid
                 $parentleveloperator = ($script:RulesOperators |  Where-Object {($_.RenderingNumber -eq $RenderingNumber) -and ($_.RuleNo -eq $rullno)  -and ($_.uid -eq $uidtolookup)}).Operator
-
+ 
+ 
                 for($parentindex=0; $parentindex -le  $parentconditionName.count-1; $parentindex++){
                   if ($ruleconditiontext.length -ne 0) {
                     $ruleconditiontext = $parentconditionText[$parentindex] + " " + $parentleveloperator + "<br>"
@@ -270,16 +287,19 @@ function Invoke-Evaluate-RuleCondition-AddResult ($RenderingNumber, $rullno ){
             }
         }
       }
-  } 
-
+  }
+ 
+ 
   $ruleaction = $Script:Rules | Where-Object {($_.RenderingNumber -eq $RenderingNumber) -and ($_.RuleNo -eq $rullno)} 
   $ActionName = $ruleaction.ActionName
   $ActionDataSource =  $ruleaction.ActionDataSource
-
+ 
+ 
   Add-RuleResult $RenderingNumber $ruleaction.RenderingName $rullno $ruleconditionName $ruleconditiontext $ActionName $ActionDataSource
-} 
-
-
+}
+ 
+ 
+ 
 class Rule {
   [int] $RenderingNumber
   [string] $RenderingName
@@ -287,7 +307,8 @@ class Rule {
   [string]$ActionName
   [string]$ActionDataSource
 }
-
+ 
+ 
 class RulesOperator {
   [int] $RenderingNumber
   [int]$RuleNo
@@ -295,7 +316,8 @@ class RulesOperator {
   [int]$Level
   [string]$UID
 }
-
+ 
+ 
 class RulesCondition {
   [int] $RenderingNumber 
   [int]$RuleNo
@@ -305,7 +327,8 @@ class RulesCondition {
   [string]$ParentUID
   [bool] $isNoCondition 
 }  
-
+ 
+ 
 class RulesResult {
   [int] $RenderingNumber 
   [string] $RenderingName
@@ -315,34 +338,38 @@ class RulesResult {
   [string]$ActionName
   [string]$ActionDataSource
 }  
-
-$itemtolookup= Get-Item '/sitecore/content/Wealth Site/Home/Test Pages/Test Researching investments Performance Tab'
-#$itemtolookup =  Get-Item . -Language $SitecoreContextItem.Language.Name
+ 
+ 
+$itemtolookup =  Get-Item . -Language $SitecoreContextItem.Language.Name
 $renderings = Get-Rendering -Item $itemtolookup -FinalLayout | Where-Object { ![string]::IsNullOrEmpty($_.Rules)} 
 $renderingnumber=0 
 $rulecount=0
-
+ 
+ 
 [Rule[]]$Rules = @()  
 [RulesOperator[]] $Script:RulesOperators = @()  
 [RulesCondition[]]$Script:RulesConditions = @()  
 [RulesResult[]]$Script:RulesResults = @()   
-   
+ 
 Write-Host "Item:  $itemtolookup"
-
+ 
+ 
 foreach($rendering in $renderings) {
   $renderingnumber++
   if($rendering ) 
   {
       $renderingItem= Get-Item "master://" -ID $rendering.ItemID
       Write-Host "`n##############################  Rendering: "$renderingItem.Name , Rendering number: $renderingnumber " #########################################"
-
+ 
+ 
       $xml = New-Object -TypeName System.Xml.XmlDocument
       $xml.LoadXml($rendering.Rules)
-      write-host $rendering.Rules
+     # write-host $rendering.Rules
       $operatorslist = @('and','or')
       $operators= [string]::Join('|',$operatorslist)
       $rulecount = 0
-
+ 
+ 
       foreach($rule in $xml.ruleset.rule) {
           $rulecount++
           Write-Host "`n  Rule $rulecount.    Rule Name: " $rule.Name
@@ -371,7 +398,7 @@ foreach($rendering in $renderings) {
               }
               $actiondetail =if($actiondetail -ne ''){ $actiondetail + ' , ' + $actionItem.Name } else {$actionItem.Name }
             }
-            
+ 
             $ruledetail=[Rule]@{
               RenderingNumber=$RenderingNumber
               RenderingName = $renderingItem.Name
@@ -389,23 +416,26 @@ foreach($rendering in $renderings) {
               ActionDataSource= '' 
             } 
           }
-
+ 
+ 
           Write-Host "`n    ActionName: " $actiondetail   ", Datasource: " $datasourcedetail
-        
+ 
           $Rules +=$ruledetail 
           $dbname=""
       }
   }
 }
-
+ 
+ 
 $renderinglist = $Rules.RenderingNumber |  Sort-Object | Get-Unique
-
+ 
+ 
 foreach($renderingrule in $renderinglist){
   $activeRenderingNumber =   $renderingrule
-  
+ 
   #  $Script:RulesConditions | Where-Object {($_.RenderingNumber -eq 11 -and $_.RuleNo -eq 1) }  | format-table | show-listview
-  #  $Script:RulesOperators | Where-Object {($_.RenderingNumber -eq 11 -and $_.RuleNo -eq 1) } | format-table 
-  
+  #  $Script:RulesOperators | Where-Object {($_.RenderingNumber -eq 11 -and $_.RuleNo -eq 1) } | format-table
+ 
   #  check for any missed entry in RulesCondition due to not having conditions under operator
 #  if ($activeRenderingNumber -eq 11) {
   $rop=$script:RulesOperators |  Where-Object {($_.RenderingNumber -eq $activeRenderingNumber) } 
@@ -415,8 +445,9 @@ foreach($renderingrule in $renderinglist){
         Add-RuleCondition ($rulesOperatoritem.level + 1) ' ' ' ' $rulesOperatoritem.uid $activeRenderingNumber $rulesOperatoritem.ruleno $true
     }
   } 
-#  } 
-
+#  }
+ 
+ 
   #To evaluate all rules of active rendering and save into result table
   $allRenderingCondition =  $Script:RulesConditions | Where-Object {($_.RenderingNumber -eq $activeRenderingNumber) } 
   $rclist = $allRenderingCondition.RuleNo |  Sort-Object | Get-Unique
@@ -426,7 +457,8 @@ foreach($renderingrule in $renderinglist){
     } 
   } 
 }
-
+ 
+ 
 #Finally show result in report
 $Script:RulesResults |  Show-ListView -InfoTitle "Personization Report" -InfoDescription (" Here Rendering Number is evaluated w.r.t. to Personization, Item : " + $itemtolookup.fullpath) -Property `
 @{Label="Rendering Name"; Expression={$_.RenderingName} }, 
@@ -436,3 +468,5 @@ $Script:RulesResults |  Show-ListView -InfoTitle "Personization Report" -InfoDes
 @{Label="Condition Text"; Expression={$_.ConditionText  } }, 
 @{Label="Action"; Expression={$_.ActionName  } }, 
 @{Label="Action DataSource"; Expression={$_.ActionDataSource  } }
+
+has context menu
